@@ -1,20 +1,40 @@
 version: "3.8"
+
 services:
-  thingsboard:
-    image: ${TB_IMAGE}
-    container_name: ${TB_CONTAINER_NAME}
+  postgres:
+    image: postgres:16
     restart: always
-    ports:
-      - "${TB_WEB_PORT}:8080"                          # ThingsBoard Web UI
-      - "${TB_MQTT_PORT}:1883"                         # TB MQTT endpoint (Mosquitto can stay on 1883)
-      - "${TB_COAP_PORT_RANGE}:5683-5688/udp"         # Optional CoAP/LwM2M ports
     environment:
-      TB_QUEUE_TYPE: ${TB_QUEUE_TYPE}
-      LOAD_DEMO: "${TB_LOAD_DEMO}"
+      POSTGRES_DB: thingsboard
+      POSTGRES_PASSWORD: postgres   # Change this in production!
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"   # Optional: only if you want external access
+
+  thingsboard:
+    image: thingsboard/tb-node:4.3.0.1   # Use latest arm64-supported tag; check Docker Hub for updates
+    container_name: thingsboard
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"                          # Web UI
+      - "1884:1883"                          # MQTT (leave 1883 for Mosquitto)
+      - "5683-5688:5683-5688/udp"           # CoAP/LwM2M (optional)
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      TB_QUEUE_TYPE: in-memory               # Default; use 'kafka' for production
+      TB_SERVICE_ID: tb-node-1               # Required for node identification
+      # Optional: Limit Java heap on RPi (adjust based on your model, e.g., 4GB → 2-3GB max)
+      # JAVA_OPTS: "-Xms512m -Xmx2048m"
     volumes:
       - tb-data:/data
       - tb-logs:/var/log/thingsboard
 
 volumes:
+  postgres-data:
   tb-data:
   tb-logs:

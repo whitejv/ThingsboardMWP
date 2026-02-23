@@ -48,22 +48,39 @@ Create `docker-compose.yml`:
 ```yaml
 version: "3.8"
 services:
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_PASSWORD: postgres   # Change this in production!
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # ports:
+    #   - "5432:5432"   # Optional: only if you want external access
+
   thingsboard:
-    image: thingsboard/tb-postgres:latest
+    image: thingsboard/tb-node:4.3.0.1
     container_name: thingsboard
     restart: always
+    depends_on:
+      - postgres
     ports:
       - "8080:8080"               # ThingsBoard Web UI
-      - "1884:1883"               # TB MQTT endpoint (Mosquitto can stay on 1883)
+      - "1884:1883"               # TB MQTT endpoint (leave 1883 for Mosquitto)
       - "5683-5688:5683-5688/udp" # Optional CoAP/LwM2M ports
     environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
       TB_QUEUE_TYPE: in-memory
-      LOAD_DEMO: "false"
+      TB_SERVICE_ID: tb-node-1
     volumes:
       - tb-data:/data
       - tb-logs:/var/log/thingsboard
 
 volumes:
+  postgres-data:
   tb-data:
   tb-logs:
 ```
@@ -137,22 +154,37 @@ cd "$HOME/thingsboard-water"
 cat > docker-compose.yml <<'EOF'
 version: "3.8"
 services:
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
   thingsboard:
-    image: thingsboard/tb-postgres:latest
+    image: thingsboard/tb-node:4.3.0.1
     container_name: thingsboard
     restart: always
+    depends_on:
+      - postgres
     ports:
       - "8080:8080"
       - "1884:1883"
       - "5683-5688:5683-5688/udp"
     environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
       TB_QUEUE_TYPE: in-memory
-      LOAD_DEMO: "false"
+      TB_SERVICE_ID: tb-node-1
     volumes:
       - tb-data:/data
       - tb-logs:/var/log/thingsboard
 
 volumes:
+  postgres-data:
   tb-data:
   tb-logs:
 EOF

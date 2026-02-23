@@ -2,39 +2,51 @@ version: "3.8"
 
 services:
   postgres:
-    image: postgres:16
     restart: always
+    image: "postgres:16"
+    ports:
+      - "5432"  # Optional: only expose if external access needed
     environment:
       POSTGRES_DB: thingsboard
       POSTGRES_PASSWORD: postgres   # Change this in production!
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"   # Optional: only if you want external access
 
   thingsboard:
-    image: thingsboard/tb-node:4.3.0.1   # Use latest arm64-supported tag; check Docker Hub for updates
-    container_name: thingsboard
     restart: always
-    depends_on:
-      - postgres
+    image: "thingsboard/tb-node:4.3.0.1"
     ports:
       - "8080:8080"                          # Web UI
-      - "1884:1883"                          # MQTT (leave 1883 for Mosquitto)
+      - "1884:1883"                          # MQTT (bridged from Mosquitto)
+      - "7070:7070"                          # Edge RPC port
+      - "8883:8883"                          # MQTT over SSL
       - "5683-5688:5683-5688/udp"           # CoAP/LwM2M (optional)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
     environment:
+      TB_SERVICE_ID: tb-node-1               # Required for node identification
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       TB_QUEUE_TYPE: in-memory               # Default; use 'kafka' for production
-      TB_SERVICE_ID: tb-node-1               # Required for node identification
       # Optional: Limit Java heap on RPi (adjust based on your model, e.g., 4GB → 2-3GB max)
-      # JAVA_OPTS: "-Xms512m -Xmx2048m"
+      JAVA_OPTS: "-Xms512m -Xmx2048m"
+    depends_on:
+      - postgres
     volumes:
       - tb-data:/data
       - tb-logs:/var/log/thingsboard
 
 volumes:
   postgres-data:
+    name: tb-postgres-data
+    driver: local
   tb-data:
+    name: tb-data
+    driver: local
   tb-logs:
+    name: tb-logs
+    driver: local

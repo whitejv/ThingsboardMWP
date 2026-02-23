@@ -86,6 +86,14 @@ volumes:
   tb-logs:
 ```
 
+Initialize database (FIRST TIME ONLY):
+
+```bash
+docker compose run --rm -e INSTALL_TB=true -e LOAD_DEMO=true thingsboard
+```
+
+This installs the database schema and loads demo data.
+
 Start ThingsBoard:
 
 ```bash

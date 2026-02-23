@@ -60,21 +60,28 @@ services:
     #   - "5432:5432"   # Optional: only if you want external access
 
   thingsboard:
-    image: thingsboard/tb-node:4.3.0.1
-    container_name: thingsboard
     restart: always
-    depends_on:
-      - postgres
+    image: "thingsboard/tb-node:4.3.0.1"
     ports:
       - "8080:8080"               # ThingsBoard Web UI
-      - "1884:1883"               # TB MQTT endpoint (leave 1883 for Mosquitto)
+      - "1884:1883"               # TB MQTT endpoint (bridged from Mosquitto)
+      - "7070:7070"               # Edge RPC port
+      - "8883:8883"               # MQTT over SSL
       - "5683-5688:5683-5688/udp" # Optional CoAP/LwM2M ports
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
     environment:
+      TB_SERVICE_ID: tb-node-1
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       TB_QUEUE_TYPE: in-memory
-      TB_SERVICE_ID: tb-node-1
+      JAVA_OPTS: "-Xms512m -Xmx2048m"  # Memory limits for RPi
+    depends_on:
+      - postgres
     volumes:
       - tb-data:/data
       - tb-logs:/var/log/thingsboard
@@ -85,6 +92,17 @@ volumes:
   tb-logs:
 ```
 
+Initialize database schema and system assets (FIRST TIME ONLY):
+
+```bash
+docker compose run --rm -e INSTALL_TB=true -e LOAD_DEMO=true thingsboard
+```
+
+This will:
+- Install the core database schema
+- Load built-in widgets, images, rule chains, etc.
+- Create sample tenant account and demo data (optional, set LOAD_DEMO=false to skip)
+
 Start ThingsBoard:
 
 ```bash
@@ -92,7 +110,7 @@ docker compose up -d
 docker compose logs -f
 ```
 
-Wait until logs show startup success (first run can take a few minutes).
+Wait until logs show "ThingsBoard started successfully" (first run can take 2-5 minutes).
 
 Access UI:
 
@@ -155,8 +173,10 @@ cat > docker-compose.yml <<'EOF'
 version: "3.8"
 services:
   postgres:
-    image: postgres:16
     restart: always
+    image: "postgres:16"
+    ports:
+      - "5432"
     environment:
       POSTGRES_DB: thingsboard
       POSTGRES_PASSWORD: postgres
@@ -164,29 +184,42 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   thingsboard:
-    image: thingsboard/tb-node:4.3.0.1
-    container_name: thingsboard
     restart: always
-    depends_on:
-      - postgres
+    image: "thingsboard/tb-node:4.3.0.1"
     ports:
       - "8080:8080"
       - "1884:1883"
+      - "7070:7070"
+      - "8883:8883"
       - "5683-5688:5683-5688/udp"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
     environment:
+      TB_SERVICE_ID: tb-node-1
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       TB_QUEUE_TYPE: in-memory
-      TB_SERVICE_ID: tb-node-1
+      JAVA_OPTS: "-Xms512m -Xmx2048m"
+    depends_on:
+      - postgres
     volumes:
       - tb-data:/data
       - tb-logs:/var/log/thingsboard
 
 volumes:
   postgres-data:
+    name: tb-postgres-data
+    driver: local
   tb-data:
+    name: tb-data
+    driver: local
   tb-logs:
+    name: tb-logs
+    driver: local
 EOF
 
 echo "== Step 4: Start ThingsBoard =="
@@ -205,6 +238,71 @@ echo "== Done =="
 echo "ThingsBoard UI: http://<pi-ip>:8080"
 echo "Container restart policy is set to 'always' for auto-start after boot."
 echo "If docker commands fail due to permissions, log out/in or reboot once."
+```
+
+## Troubleshooting Common Issues
+
+### Container Won't Start
+
+Check container status and logs:
+```bash
+docker compose ps
+docker compose logs thingsboard
+docker compose logs postgres
+```
+
+### Database Connection Issues
+
+If ThingsBoard can't connect to PostgreSQL:
+```bash
+# Check if PostgreSQL is running
+docker compose ps postgres
+
+# Check PostgreSQL logs
+docker compose logs postgres
+
+# Verify database initialization was completed
+docker compose run --rm -e INSTALL_TB=true thingsboard  # Re-run if needed
+```
+
+### Memory Issues on Raspberry Pi
+
+If you see OutOfMemory errors:
+```bash
+# Check memory usage
+docker stats
+
+# Reduce Java heap size in docker-compose.yml
+environment:
+  JAVA_OPTS: "-Xms256m -Xmx1024m"  # Even smaller for 4GB Pi
+```
+
+### Port Conflicts
+
+If port 1883 is already in use by Mosquitto:
+- Verify Mosquitto is running on 1883
+- ThingsBoard MQTT endpoint is correctly mapped to 1884:1883
+- Check: `netstat -tlnp | grep 1883`
+
+### ARM64 Architecture Issues
+
+For Raspberry Pi ARM64 compatibility:
+- Ensure Docker image supports ARM64 (thingsboard/tb-node does)
+- Check Docker version: `docker --version` (should be recent)
+- Verify: `docker system info | grep Architecture`
+
+### Reset Everything (Last Resort)
+
+```bash
+# Stop and remove everything
+docker compose down -v  # Removes volumes too!
+
+# Clean up
+docker system prune -f
+
+# Reinitialize from scratch
+docker compose run --rm -e INSTALL_TB=true -e LOAD_DEMO=true thingsboard
+docker compose up -d
 ```
 
 ## Manual Update Steps (No Script)

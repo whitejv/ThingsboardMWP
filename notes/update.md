@@ -29,12 +29,16 @@ docker compose logs --tail=20 thingsboard
 ### Check Current Version
 
 ```bash
-# Check running ThingsBoard version
+# Check running ThingsBoard version via API (after startup)
+# Method 1: Check startup logs for version (most reliable)
 cd /home/pi/ThingsboardMWP/config
-docker compose exec thingsboard cat /usr/share/thingsboard/bin/thingsboard.jar | head -20 | grep -i version
+docker compose logs thingsboard | grep "ThingsBoard ::" | head -1
 
-# Or check via API
-curl -s http://localhost:8080/api/components/VERSION | jq .version
+# Method 2: Check Java application logs
+docker compose logs thingsboard | grep "Starting ThingsboardServerApplication v" | tail -1
+
+# Method 3: API call with authentication (advanced)
+# Requires JWT token: curl -H "X-Authorization: Bearer YOUR_TOKEN" http://localhost:8080/api/components/VERSION
 ```
 
 ### Check Available Updates

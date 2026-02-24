@@ -81,12 +81,19 @@ Expected output:
 
 ### Check for Updates
 ```bash
-# Check current version
-cd /home/pi/ThingsboardMWP/config
-docker compose exec thingsboard cat /usr/share/thingsboard/bin/thingsboard.jar | head -20 | grep -i version
+# Check current version (after ThingsBoard is fully started)
+# Method 1: Check startup logs (most reliable)
+cd /home/pi/ThingsboardMWP/config && docker compose logs thingsboard | grep "ThingsBoard ::" | head -1
 
-# Check latest available
-docker pull thingsboard/tb-node:latest --dry-run 2>/dev/null || echo "Check Docker Hub manually"
+# Method 2: Check application startup version
+docker compose logs thingsboard | grep "Starting ThingsboardServerApplication v" | tail -1
+
+# Method 3: API call (requires authentication token)
+# First get a JWT token, then: curl -H "X-Authorization: Bearer YOUR_TOKEN" http://localhost:8080/api/components/VERSION
+
+# Check latest available on Docker Hub
+echo "Visit: https://hub.docker.com/r/thingsboard/tb-node/tags"
+echo "Or check: https://github.com/thingsboard/thingsboard/releases"
 ```
 
 ### Quick Update Process
